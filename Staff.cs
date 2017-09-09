@@ -24,15 +24,18 @@ using System.Text;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
+using Transonic.Score.Symbols;
+
 namespace Transonic.Score
 {
     public class Staff
     {
-        ScoreSheet sheet;
+        public ScoreSheet sheet;
         public List<Measure> measures;
         public int number;
         public int division;
-        public int curMeasureNum;
+        public int leftMeasureNum;
+        public int rightMeasureNum;
 
         //dimensions based upon typograhy in Beethoven's Complete Piano Sonatas, Dover ed.
         public static int staffMargin = 50;
@@ -47,7 +50,8 @@ namespace Transonic.Score
             number = num;
             division = div;
             measures = new List<Measure>();
-            curMeasureNum = 0;
+            leftMeasureNum = 0;
+            rightMeasureNum = 0;
         }
 
         public void addMeasure (Measure measure) 
@@ -55,12 +59,29 @@ namespace Transonic.Score
             measures.Add(measure);
         }
 
+//-----------------------------------------------------------------------------
+
+        public int getBeatPos(int tick)
+        {
+            int measure = getBeatMeasure(tick);
+            int result = measures[measure].getBeatPos(tick);
+            return result;
+        }
+
+        public int getBeatMeasure(int tick)
+        {
+            int i = 0;
+            while ((i < measures.Count - 1) && (measures[i + 1].startTick < tick))
+                i++;
+            return i;
+        }
+
         public void setCurrentMeasure(int tick)
         {
             int i = 0;
-            while ((i < measures.Count - 1) && (measures[i+1].startTime < tick)) 
+            while ((i < measures.Count - 1) && (measures[i+1].startTick < tick)) 
                 i++;
-            curMeasureNum = i;            
+            leftMeasureNum = i;            
         }
 
         public void dump()
@@ -72,6 +93,8 @@ namespace Transonic.Score
             }
             Console.WriteLine();
         }
+
+//- display -------------------------------------------------------------------
 
         public void drawStaff(Graphics g, int ypos)
         {
@@ -89,13 +112,12 @@ namespace Transonic.Score
             ypos += (staffSpacing + staffHeight);
             drawStaff(g, ypos);
 
-            int xpos = 0;
-            int i = curMeasureNum;
-            while ((i < measures.Count) && (xpos < sheet.Width))
+            int i = leftMeasureNum;
+            int xpos = measures[i].staffpos;
+            while ((i < measures.Count) && (measures[i].staffpos - xpos < sheet.Width))
             {
                 Measure measure = measures[i++];
                 measure.paint(g, xpos, staffMargin);
-                xpos += measure.getWidth();
             }
         }
     }
