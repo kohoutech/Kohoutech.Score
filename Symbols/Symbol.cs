@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
 Transonic Score Library
-Copyright (C) 1997-2017  George E Greaney
+Copyright (C) 1997-2018  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -30,57 +30,58 @@ namespace Transonic.Score.Symbols
 {
     public class Symbol
     {
-        public Measure measure;
-        public int startTick;           //start tick relative to measure start
-        public int duration;            //length in ticks
+        public Beat beat;
+        public Staff staff;
 
-        public int beat;                //beat that symbol starts on
-        public int len;                 //symbol len in beats
-
-        public int xpos;                //symbol pos from measure left in pixels
-        public int ypos;                //symbol pos from measure top in pixels
+        public float left;
+        public float top;
+        public float xpos;                
+        public float ypos;                
 
         public Symbol()
         {
-            measure = null;
-            startTick = 0;
-            duration = 0;
-            beat = 0;
-            len = 0;
+            beat = null;
+            staff = null;
+            left = 0;
+            top = 0;
             xpos = 0;
             ypos = 0;
         }
 
-        public virtual void setMeasure(Measure _measure)
+        public virtual void setBeat(Beat _beat)
         {
-            measure = _measure;
+            beat = _beat;
+            staff = beat.measure.staff;
+        }
+
+        public virtual void layout()
+        {
+        }
+
+        public virtual void setPos(float _xpos, float _ypos)
+        {
+            xpos = left + _xpos;
+            ypos = top + _ypos;
         }
 
         public virtual void dump()
         {
         }
 
-        public virtual void paint(Graphics g, int xpos, int ypos)
+        public virtual void paint(Graphics g)
         {
         }
-    }
 
-//-----------------------------------------------------------------------------
+//- common symbols ------------------------------------------------------------
 
-    public class TimeSignature : Symbol
-    {
-        public TimeSignature()            
-        {
-        }
-    }
+        //public static void drawSharp(Graphics g, float xpos, float ypos)
+        //{
+        //}
 
-//-----------------------------------------------------------------------------
+        //public static void drawFlat(Graphics g, float xpos, float ypos)
+        //{
+        //}
 
-    public class KeySignature : Symbol
-    {
-        public KeySignature()
-        {
-        }
     }
 
 //-----------------------------------------------------------------------------
@@ -94,19 +95,14 @@ namespace Transonic.Score.Symbols
     
 //-----------------------------------------------------------------------------
 
-    public class Rest : Symbol
-    {
-        public Rest(int _start, int _len) : base()
-        {
-            beat = _start;
-            len = _len;
-        }
+    //public class Rest : Symbol
+    //{
+    //    public Rest(int _start, int _len) : base()
+    //    {
+    //        beat = _start;
+    //        len = _len;
+    //    }
 
-        public override void paint(Graphics g, int left, int top)
-        {
-            g.FillRectangle(Brushes.Blue, left + 6, top + Staff.lineSpacing, 8, 4);
-
-        }
-    }
+    //}
 
 }

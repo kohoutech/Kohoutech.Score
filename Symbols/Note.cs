@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
 Transonic Score Library
-Copyright (C) 1997-2017  George E Greaney
+Copyright (C) 1997-2018  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -30,6 +30,33 @@ namespace Transonic.Score.Symbols
 {
     public class Note : Symbol
     {
+        public enum NOTETYPE
+        {
+            Note1024 = 0,
+            Note512,
+            Note256,
+            Note128,
+            SixtyFourth,
+            ThirtySecond,
+            Sixteenth,
+            Eighth,
+            Quarter,
+            Half,
+            Whole,
+            DoubleWhole,
+            QuadWhole,
+            OctoWhole
+        }
+
+        public enum NOTESIZE
+        {
+            Full = 0,
+            Cue,
+            Gracecue,
+            Large
+        }
+
+
         public const int quantization = 8;         //quantize notes to 1/32 note pos (quarter note / 8)
 
         public const String flat = "\u266d";
@@ -38,131 +65,194 @@ namespace Transonic.Score.Symbols
 
         //public const String quarter = "\u2669";
 
-        public int noteNumber;          //midi pitch
+        public int notenum;
         public int octave;
         public int step;
-        public int ledgerLinesAbove;
-        public bool ledgerLinesMiddle;
-        public int ledgerLinesBelow;
-        public bool hasSharp;
+        public int alter;
+        public bool hasAccidental;
+        public int accidental;
+        public decimal semitones;
+        public bool chord;
+        public bool cue;
+        public bool rest;
+        public decimal duration;
+        public NOTETYPE notetype;
+        public NOTESIZE notesize;
+        public bool dot;
+        public int staffnum;
 
-        public Note(int _start, int _noteNum, int _dur)
+        public Stem stem;
+        public Beam beam;
+
+        public Note() : base()
         {
-            startTick = _start;
-            noteNumber = _noteNum;
-            duration = _dur;
-
-            octave = noteNumber / 12;
-            step = noteNumber % 12;
-            ledgerLinesAbove = 0;
-            ledgerLinesMiddle = false;
-            ledgerLinesBelow = 0;
+            chord = false;
+            cue = false;
+            rest = false;
+            notenum = 0;
+            octave = 0;
+            step = 0;
+            alter = 0;
+            hasAccidental = false;
+            accidental = 0;
+            semitones = 0;
+            duration = 0;
+            notetype = NOTETYPE.Quarter;
+            notesize = NOTESIZE.Full;
+            dot = false;
+            staffnum = 1;
         }
 
-        public override void setMeasure(Measure measure)
+        string[] noteletters = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+
+        public override void dump()        
         {
-            base.setMeasure(measure);
-
-            startTick -= measure.startTick;
-
-            //quantize start to nearest beat
-            double val = (double)startTick / measure.staff.division;
-            beat = (int)((val * quantization) + 0.5f);
-
-            //quatize duration to next beat
-            val = (double)duration / measure.staff.division;
-            len = (int) Math.Ceiling((val * quantization * 2));
-
-            setVertPos();
-            hasSharp = (keyOfC[step] == 1);
+            if (!rest)
+            {
+                String pitchstr = noteletters[(notenum % 12)] + ((notenum / 12) - 1).ToString();
+                Console.WriteLine("note pitch = " + pitchstr + " duration = " + duration);
+            }
+            else
+            {
+                Console.WriteLine("rest : duration = " + duration);
+            }
         }
 
-        int[] scaleTones = { 0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6 };
-        int[] keyOfC = { 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0 };
+        //public Note(int _start, int _noteNum, int _dur)
+        //{
+        //    startTick = _start;
+        //    noteNumber = _noteNum;
+        //    duration = _dur;
+
+        //    octave = noteNumber / 12;
+        //    step = noteNumber % 12;
+        //    ledgerLinesAbove = 0;
+        //    ledgerLinesMiddle = false;
+        //    ledgerLinesBelow = 0;
+        //}
+
+        //int[] scaleTones = { 0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6 };
+        //int[] keyOfC = { 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0 };
+
+        public static int[,] circleOfFifths = {{-1, -1, -1, 0, -1, -1, -1},         //Gb
+                                 {0, -1, -1, 0, -1, -1, -1},         //Db
+                                 {0, -1, -1, 0, 0, -1, -1},         //Ab
+                                 {0, 0, -1, 0, 0, -1, -1},         //Eb
+                                 {0, 0, -1, 0, 0, 0, -1},         //Bb
+                                 {0, 0, 0, 0, 0, 0, -1},         //F
+                                 {0, 0, 0, 0, 0, 0, 0},         //C
+                                 {0, 0, 0, 1, 0, 0, 0},         //G
+                                 {1, 0, 0, 1, 0, 0, 0},         //D
+                                 {1, 0, 0, 1, 1, 0, 0},         //A
+                                 {1, 1, 0, 1, 1, 0, 0},         //E
+                                 {1, 1, 0, 1, 1, 1, 0},         //B
+                                 {1, 1, 1, 1, 1, 1, 0}          //F#                                
+                                };
 
         //set verical note pos relative to top of staff
         //notes from middle C and higher belong to the treble clef, notes below middle C belong to bass clef
-        public void setVertPos()
-        { 
-            int halfStep = Staff.lineSpacing / 2;
-
-            //treble clef
-            if (noteNumber >= 60)
+        public override void layout()
+        {
+            if (!rest)
             {
-                int cpos = Staff.lineSpacing * 5;        //pos of middle C
-                ypos = cpos - (((octave - 5) * halfStep * 7) + (scaleTones[step] * halfStep));
-                if (ypos < 0)
+                left = 0;
+                float halfStep = staff.spacing / 2;
+
+                //treble clef
+                if (notenum >= 60)
                 {
-                    ledgerLinesAbove = ypos / Staff.lineSpacing;
+                    float cpos = staff.spacing * 5;                             //pos of middle C = 60
+                    top = (cpos) - ((octave - 5) * halfStep * 7) - (step * halfStep);
+
+                    //ledger lines about the staff
+                    if (notenum > 80)
+                    {
+                        int linesabove = ((step - 3) + ((octave - 6) * 7)) / 2;
+                        if (linesabove > beat.ledgerLinesAbove)
+                        {
+                            beat.ledgerLinesAbove = linesabove;
+                        }
+                    }
+
+                    beat.ledgerLinesMiddle = (notenum == 60 | notenum == 61);       //middle C ledger line
                 }
-                ledgerLinesMiddle |= (noteNumber == 60 | noteNumber == 61);
 
+                //bass clef
+                else
+                {
+                    float bottom = staff.spacing * 8 + staff.separation;
+                    float cpos = bottom + (staff.spacing * 12 + halfStep);    //pos of MIDI C = 0
+                    top = cpos - (octave * halfStep * 7) - (step * halfStep);
+
+                    if (notenum < 41)
+                    {
+                        int linesbelow = ((step - 4) - ((3 - octave) * 7)) / -2;
+                        if (linesbelow > beat.ledgerLinesBelow)
+                        {
+                            beat.ledgerLinesBelow = linesbelow;
+                        }
+                    }
+                }
+
+                int accidnote = (octave * 7) + step;
+                if (beat.measure.accidentals[accidnote] != alter)           //if note's alter diff than current alter val for note
+                {
+                    hasAccidental = true;
+                    accidental = alter;                                     //it has an accidental
+                    beat.measure.accidentals[accidnote] = alter;            //save this accidental so other notes in measure won't have one
+                }
             }
-
-            //bass clef
             else
             {
-                int cpos = Staff.grandHeight + Staff.lineSpacing * 12 + halfStep;    //pos of MIDI C = 0
-                ypos = cpos - ((octave * halfStep * 7) + (scaleTones[step] * halfStep));
-                if (ypos > Staff.grandHeight)
-                {
-                    ledgerLinesBelow = (ypos - Staff.grandHeight) / Staff.lineSpacing;
-                }
+                left = 0;
+                top = (staffnum == 1) ? staff.spacing * 1.5f : staff.spacing * 9;
             }
-        }
-
-        public override void dump()
-        {
-            float tick = (float)startTick / measure.staff.division;
-            float dur = (float)duration / measure.staff.division;
-
-            Console.WriteLine("Measure " + measure.number + " note: " + noteNumber +
-                " at " + beat.ToString("F2") + "(" + tick.ToString("F2") +
-                ") len " + len.ToString("F2") + "(" + dur.ToString("F2") + ")");
         }
 
 //- display -------------------------------------------------------------------
 
-        public override void paint(Graphics g, int xorg, int top)
+        public override void paint(Graphics g)
         {
-            xorg += xpos;
-            if (ledgerLinesAbove < 0)
+            if (!rest)
             {
-                int linepos = top - Staff.lineSpacing;
-                for (int i = 0; i > ledgerLinesAbove; i--)
+                if (hasAccidental)
                 {
-                    g.DrawLine(Pens.Red, xorg - 2, linepos, xorg + 10, linepos);
-                    linepos -= Staff.lineSpacing;
+                    Font symfont = new Font("Arial", 14);
+                    switch (accidental)
+                    {
+                        case 0:
+                            g.DrawString(natural, symfont, Brushes.Blue, xpos - 14, ypos - 8);
+                            break;
+                        case 1:
+                            g.DrawString(sharp, symfont, Brushes.Blue, xpos - 14, ypos - 12);
+                            break;
+                        case -1:
+                            g.DrawString(flat, symfont, Brushes.Blue, xpos - 14, ypos - 12);
+                            break;
+                        default:
+                            break;
+                    }
+                    symfont.Dispose();
                 }
-            }
 
-            if (ledgerLinesMiddle)
-            {
-                g.DrawLine(Pens.Red, xorg - 2, top + (Staff.lineSpacing * 5), xorg + 10, top + (Staff.lineSpacing * 5));
-            }
-
-            if (ledgerLinesBelow > 0)
-            {
-                int linepos = top + Staff.grandHeight + Staff.lineSpacing;
-                for (int i = 0; i < ledgerLinesBelow; i++)
+                if (notetype.CompareTo(NOTETYPE.Half) < 0)
                 {
-                    g.DrawLine(Pens.Red, xorg - 2, linepos, xorg + 10, linepos);
-                    linepos += Staff.lineSpacing;
+                    g.FillEllipse(Brushes.Red, xpos - 4, ypos - 4, 8, 8);       //closed note head
                 }
+                else
+                {
+                    g.DrawEllipse(Pens.Red, xpos - 4, ypos - 4, 8, 8);          //open note head
+                    g.DrawEllipse(Pens.Red, xpos - 3, ypos - 3, 6, 6);
+                }
+                g.DrawLine(Pens.Red, xpos + 4, ypos, xpos + 4, ypos - staff.spacing * 3);       //stem
             }
-
-            top += ypos;
-
-            if (hasSharp)
+            else
             {
-                Font sharpfont = new Font("Arial", 14);
-                g.DrawString(sharp, sharpfont, Brushes.Red, xorg - 12, top - 12);
-
+                g.FillRectangle(Brushes.Red, xpos - 4, ypos, 8, 4);         //rest
             }
-
-            g.FillEllipse(Brushes.Red, xorg, top - 4, 8, 8);
-            g.DrawLine(Pens.Red, xorg + 8, top, xorg + 8, top - Staff.lineSpacing * 3);
-
         }
-    }
+
+     }
 }
+
+//Console.WriteLine("there's no sun in the shadow of the wizard");

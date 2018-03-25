@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
 Transonic Score Library
-Copyright (C) 1997-2017  George E Greaney
+Copyright (C) 1997-2018  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -25,184 +25,104 @@ using System.Windows.Forms;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
-using Transonic.MIDI;
-using Transonic.Score.Symbols;
-
 namespace Transonic.Score
 {
     public class ScoreSheet : UserControl
     {
         IScoreWindow window;
-        Sequence seq;
-        List<TimeSignature> timesigs;
-        List<KeySignature> keysigs;
-        List<Staff> staves;
-        Staff displayStaff;
-        int curTick;
-        int barPos;
+        private HScrollBar horzScroll;
+        ScoreDoc score;
 
         public ScoreSheet(IScoreWindow _window)
         {
             window = _window;
-            seq = null;
+            score = null;
             InitializeComponent();
-            staves = new List<Staff>();
-            displayStaff = null;
-            curTick = 0;
-            barPos = 100;
         }
 
         private void InitializeComponent()
         {
+            this.horzScroll = new System.Windows.Forms.HScrollBar();
             this.SuspendLayout();
+            // 
+            // horzScroll
+            // 
+            this.horzScroll.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.horzScroll.Location = new System.Drawing.Point(0, 195);
+            this.horzScroll.Name = "horzScroll";
+            this.horzScroll.Size = new System.Drawing.Size(650, 17);
+            this.horzScroll.TabIndex = 0;
+            this.horzScroll.Scroll += new System.Windows.Forms.ScrollEventHandler(this.horzScroll_Scroll);
             // 
             // ScoreSheet
             // 
-            this.BackColor = System.Drawing.Color.LightGoldenrodYellow;
+            this.AutoScroll = true;
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(255)))), ((int)(((byte)(150)))));
+            this.Controls.Add(this.horzScroll);
+            this.DoubleBuffered = true;
             this.Name = "ScoreSheet";
             this.Size = new System.Drawing.Size(650, 212);
             this.ResumeLayout(false);
 
         }
 
-//- sequencing ----------------------------------------------------------------
-
-        public void setSequence(Sequence _seq)
+        public  void setScore(ScoreDoc _score)
         {
-            seq = _seq;
-            parseSequence();
+            score = _score;
+            score.sheet = this;
+            score.resize(this.Width, this.Height);
+            horzScroll.Maximum = (int)score.curPart.staves[0].width - this.Width + 50;
+            Invalidate();
         }
 
-        private void parseSequence()
+        protected override void OnResize(EventArgs e)
         {
-            staves.Clear();
-
-            //these are separate from the midi tracks
-            timesigs = getTimeSigSymbols();
-            keysigs = getKeySigSymbols();
-
-            //create each staff out of track's midi data, add & layout symbols to measures
-            for (int i = 1; i < seq.tracks.Count; i++)
+            base.OnResize(e);
+            if (score != null)
             {
-                Staff staff = parseTrack(seq.tracks[i], i, timesigs, keysigs);
-                staves.Add(staff);
+                score.resize(this.Width, this.Height);
+                horzScroll.Maximum = (int)score.curPart.staves[0].width - this.Width + 50;
             }
+            Invalidate();
         }
 
-        private List<TimeSignature> getTimeSigSymbols()
+        public void setCurrentPart(int partNum)
         {
-            List<TimeSignature> timesigs = new List<TimeSignature>();
-            return timesigs;
+            score.curPart = score.parts[partNum];
+            Invalidate();
         }
 
-        private List<KeySignature> getKeySigSymbols()
+        internal void setCurrentBeat(int measureNum, decimal beat)
         {
-            List<KeySignature> keysigs = new List<KeySignature>();
-            return keysigs;
-        }
-        
-        private Staff parseTrack(Track track, int staffNum, List<TimeSignature> timesigs, List<KeySignature> keysigs)
-        {
-            Staff staff = new Staff(this, staffNum, seq.division);
-            List<Symbol> syms = getTrackSymbols(track);                //get all the notes, time & key sigs for this track
-            buildStaff(staff, syms);                                   //create measures for staff & put symbols in them
+            score.curMeasure = measureNum;
+            score.curBeat = beat;
 
-            Measure prevMeasure = null;
-            foreach (Measure measure in staff.measures)
+            Measure measure = score.curPart.staves[0].measures[measureNum];
+            measure.setCurrentBeat(score.curBeat);
+            score.curStaffPos = measure.curBeat.measpos + measure.staffpos + score.curPart.staves[0].left;
+
+            //if we've passed the left side of the window
+            if ((int)score.curStaffPos < (horzScroll.Value))
             {
-                measure.layoutSymbols(prevMeasure);
-                prevMeasure = measure;
+                int newofs = (int)score.curStaffPos - 25;
+                horzScroll.Value = (newofs > horzScroll.Minimum) ? newofs : horzScroll.Minimum;
             }
 
-            //staff.dump();
-            return staff;
+            //if we've passed the right side of the window
+            if ((int)score.curStaffPos > (horzScroll.Value + this.Width - 25))
+            {
+                int newofs = (int)score.curStaffPos - 25;
+                horzScroll.Value = (newofs < horzScroll.Maximum) ? newofs : horzScroll.Maximum;
+            }
+
+            Invalidate();
         }
 
-        //scan track, convert note on/note off pairs into list of notes for single track
-        //if we can't find a note off for a note on, we ignore it (stuck note?)
-        //add in time and key signature symbols
-        public List<Symbol> getTrackSymbols(Track track)
+        private void horzScroll_Scroll(object sender, ScrollEventArgs e)
         {
-            List<Symbol> notes = new List<Symbol>();
-            for (int i = 0; i < track.events.Count; i++)
-            {
-                Event evt = track.events[i];
-
-                //note on/note off pair
-                if (evt.msg is NoteOnMessage)
-                {
-                    NoteOnMessage noteOn = (NoteOnMessage)evt.msg;
-                    for (int j = i + 1; j < track.events.Count; j++)
-                    {
-                        if (track.events[j].msg is NoteOffMessage)
-                        {
-                            NoteOffMessage noteOff = (NoteOffMessage)track.events[j].msg;
-                            if ((noteOn.noteNumber == noteOff.noteNumber) && (noteOn.channel == noteOff.channel))
-                            {
-                                int duration = (int)(track.events[j].time - evt.time);
-                                Note note = new Note((int)evt.time, noteOn.noteNumber, duration);
-                                notes.Add(note);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            return notes;
+            Invalidate();
         }
 
-        public void buildStaff(Staff staff, List<Symbol> syms)
-        {
-            int ticksPerMeasure = seq.division * 4;         //for the moment assume 4/4 time
-            int measureNum = 1;
-            int measureTime = 0;
-            Measure measure = new Measure(staff, measureNum, measureTime, 4, 4, 0);        //initial measure
-            staff.addMeasure(measure);
-
-            foreach (Symbol sym in syms)
-            {
-                if (sym is Note)
-                {
-                    Note note = (Note)sym;
-                    int noteTime = note.startTick;
-                    int noteMeasure = (noteTime / ticksPerMeasure) + 1;
-                    while (noteMeasure > measureNum)                        //add empty measures until we get to the one we're one now
-                    {
-                        measureTime += ticksPerMeasure;
-                        measure = new Measure(staff, ++measureNum, measureTime, 4, 4, 0);
-                        staff.addMeasure(measure);
-                    }
-                    measure.addSymbol(note);
-                    note.setMeasure(measure);
-                }
-            }
-        }
-
-        public void setDisplayStaff(int staffNum)
-        {
-            if (staffNum < seq.tracks.Count)
-            {
-                displayStaff = staves[staffNum - 1];
-                displayStaff.setCurrentMeasure(curTick);
-                Invalidate();
-            }
-            else
-            {
-                displayStaff = null;
-            }
-        }
-
-        public void setCurrentBeat(int tick)
-        {
-            curTick = tick;
-            if (displayStaff != null)
-            {
-                
-                barPos = displayStaff.getBeatPos(tick);
-                displayStaff.setCurrentMeasure(curTick);
-                Invalidate();
-            }
-        }
 
 //- painting ------------------------------------------------------------------
 
@@ -210,19 +130,21 @@ namespace Transonic.Score
         {
             base.OnPaint(e);
             Graphics g = e.Graphics;
+            g.TranslateTransform(-horzScroll.Value, 0);
+
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
-            if (displayStaff != null)
+            if (score != null)
             {
-                displayStaff.paint(g);
+                score.paint(g);
             }
-
-            g.DrawLine(Pens.Red, barPos, 0, barPos, this.Height);
+            g.ResetTransform();
         }
     }
 
 //-----------------------------------------------------------------------------
 
+    //for communication with the program's UI that is using the score sheet
     public interface IScoreWindow
     {
     }
