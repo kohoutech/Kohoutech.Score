@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Transonic Score Library
-Copyright (C) 1997-2018  George E Greaney
+Kohoutech Score Library
+Copyright (C) 1997-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,7 +22,7 @@ using System.Xml.Serialization;
 //classes for reading/writing to MusicXML files
 //generated using MS xsd.exe from MUSICXML's musicxml.xsd (https://github.com/w3c/musicxml)
 
-namespace Transonic.Score.MusicXML
+namespace Kohoutech.Score.MusicXML
 {
 
 //- score part-wise -----------------------------------------------------------

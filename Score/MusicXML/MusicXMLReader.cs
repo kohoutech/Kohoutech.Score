@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Transonic Score Library
-Copyright (C) 1997-2018  George E Greaney
+Kohoutech Score Library
+Copyright (C) 1997-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -26,10 +26,10 @@ using System.IO.Compression;
 using System.Xml;
 using System.Xml.Serialization;
 
-using Transonic.Score;
-using Transonic.Score.Symbols;
+using Kohoutech.Score;
+using Kohoutech.Score.Symbols;
 
-namespace Transonic.Score.MusicXML
+namespace Kohoutech.Score.MusicXML
 {
     public class MusicXMLReader
     {
@@ -786,7 +786,7 @@ namespace Transonic.Score.MusicXML
             return null;
         }
 
-        public static Transonic.Score.Symbols.Encoding parseEncodingXML(XmlNode node)
+        public static Kohoutech.Score.Symbols.Encoding parseEncodingXML(XmlNode node)
         {
             return null;
         }
